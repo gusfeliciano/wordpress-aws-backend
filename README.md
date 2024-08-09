@@ -1,49 +1,83 @@
 # WordPress AWS Backend
 
-This project sets up a scalable and maintainable WordPress backend infrastructure on AWS using CloudFormation.
-
-The goal is to migrate an existing WordPress site to AWS for improved performance, reliability, and scalability.
+This project sets up a scalable and maintainable WordPress backend infrastructure on AWS using CloudFormation. The infrastructure is split into three separate stacks for better modularity and management.
 
 ## Overview
 
 This backend setup includes:
 
-1. EC2 instance for hosting WordPress
-2. RDS MySQL database for WordPress data
-3. Security groups for controlling access
-4. (Future addition) S3 bucket for media storage
-5. (Future addition) CloudFront distribution for content delivery
+1. Networking Stack: VPC, Subnets, Internet Gateway, Route Tables
+2. Database Stack: RDS MySQL instance, Security Group for RDS
+3. Application Stack: EC2 instance for hosting WordPress, Security Group for EC2
 
 ## Prerequisites
 
 - AWS CLI installed and configured with appropriate permissions
-- Basic understanding of AWS services (EC2, RDS, CloudFormation)
+- Basic understanding of AWS services (EC2, RDS, VPC, CloudFormation)
 - Git for version control
 
-## Deployment
+## Deployment Steps
 
-1. Clone this repository
-2. Update the `wordpress-stack.yaml` file with your desired configurations
-3. Deploy the CloudFormation stack using AWS CLI:
+1. Clone this repository:
+   ```
+   git clone https://github.com/yourusername/wordpress-aws-backend.git
+   cd wordpress-aws-backend
+   ```
 
-```bash
-aws cloudformation create-stack --stack-name WordPressStack --template-body file://wordpress-stack.yaml --parameters ParameterKey=DBName,ParameterValue=wordpressdb ParameterKey=DBUser,ParameterValue=admin ParameterKey=DBPassword,ParameterValue=your-secure-password --profile wordpress-project
-```
+2. Deploy the Networking Stack:
+   ```
+   aws cloudformation create-stack --stack-name WordPressNetworking --template-body file://networking-stack.yaml --profile wordpress-aws
+   ```
 
-Replace `your-secure-password` with a strong password for your WordPress database.
+3. Deploy the Database Stack:
+   ```
+   aws cloudformation create-stack --stack-name WordPressDatabase --template-body file://database-stack.yaml --parameters ParameterKey=DBPassword,ParameterValue=YourSecurePassword --profile wordpress-aws
+   ```
+   Replace `YourSecurePassword` with a secure password for your database.
+
+4. Create an EC2 key pair (if you haven't already):
+   ```
+   aws ec2 create-key-pair --key-name WordPressKeyPair --query 'KeyMaterial' --output text > WordPressKeyPair.pem --profile wordpress-aws
+   ```
+
+5. Deploy the Application Stack:
+   ```
+   aws cloudformation create-stack --stack-name WordPressApplication --template-body file://application-stack.yaml --parameters ParameterKey=KeyName,ParameterValue=WordPressKeyPair ParameterKey=DBPassword,ParameterValue=YourSecurePassword --capabilities CAPABILITY_IAM --profile wordpress-aws
+   ```
+
+6. Retrieve WordPress website URL:
+   ```
+   aws cloudformation describe-stacks --stack-name WordPressApplication --query 'Stacks[0].Outputs[?OutputKey==`WebsiteURL`].OutputValue' --output text --profile wordpress-aws
+   ```
 
 ## Post-Deployment
 
 After successful deployment:
 
-1. Access the EC2 instance and install WordPress
-2. Configure WordPress to use the RDS database
-3. Install and configure necessary plugins for headless functionality (e.g., WPGraphQL)
+1. Access the WordPress site using the URL provided in the previous step.
+2. Complete the WordPress installation process through the web interface.
+
+## Security Considerations
+
+- The EC2 instance is publicly accessible via HTTP and SSH. Consider restricting SSH access to your IP address.
+- Database credentials are passed as parameters. Consider using AWS Secrets Manager for enhanced security.
+- The RDS instance is not publicly accessible and can only be accessed from within the VPC.
 
 ## Maintenance
 
-Regular updates and backups are crucial for maintaining a secure and efficient WordPress backend. Consider setting up automated backups and update processes.
+- Regularly update WordPress core, themes, and plugins.
+- Monitor AWS resources for performance and costs.
+- Implement a backup strategy for both the EC2 instance and RDS database.
+- Consider setting up automated patching for the EC2 instance.
 
 ## Contributing
 
 Contributions to improve the infrastructure setup are welcome. Please submit pull requests or open issues to discuss potential changes.
+
+## Troubleshooting
+
+If you encounter issues:
+1. Check CloudFormation events for each stack for error messages.
+2. Verify that all stacks were created successfully.
+3. Check EC2 instance logs for any startup script errors.
+4. Ensure your AWS CLI profile has necessary permissions.

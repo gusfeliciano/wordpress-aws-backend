@@ -2,6 +2,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Database Stack for WordPress Setup'
 
 Parameters:
+  # Input parameters for the stack
   NetworkingStackName:
     Type: String
     Description: The name of the networking stack
@@ -20,6 +21,7 @@ Parameters:
     NoEcho: true
 
 Resources:
+  # Security group for the RDS instance
   WordPressDBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -35,6 +37,7 @@ Resources:
             Fn::ImportValue: 
               !Sub "${NetworkingStackName}-VPCCIDR"
 
+  # RDS MySQL instance
   WordPressDB:
     Type: AWS::RDS::DBInstance
     Properties:
@@ -51,6 +54,7 @@ Resources:
       DBSubnetGroupName: !Ref WordPressDBSubnetGroup
       MultiAZ: false
 
+  # Subnet group for the RDS instance
   WordPressDBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
@@ -59,6 +63,7 @@ Resources:
         - Fn::ImportValue: !Sub "${NetworkingStackName}-PublicSubnet1"
         - Fn::ImportValue: !Sub "${NetworkingStackName}-PublicSubnet2"
 
+# Output section to export values for use in other stacks
 Outputs:
   DatabaseEndpoint:
     Description: The connection endpoint for the database

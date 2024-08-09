@@ -2,6 +2,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Networking Stack for WordPress Setup'
 
 Resources:
+  # Create a VPC for the WordPress infrastructure
   WordPressVPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -12,6 +13,7 @@ Resources:
         - Key: Name
           Value: WordPress VPC
 
+  # Create two public subnets in different Availability Zones
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
@@ -34,6 +36,7 @@ Resources:
         - Key: Name
           Value: WordPress Public Subnet 2
 
+  # Create an Internet Gateway for public internet access
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
@@ -41,12 +44,14 @@ Resources:
         - Key: Name
           Value: WordPress Internet Gateway
 
+  # Attach the Internet Gateway to the VPC
   AttachGateway:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
       VpcId: !Ref WordPressVPC
       InternetGatewayId: !Ref InternetGateway
 
+  # Create a route table for the public subnets
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -55,6 +60,7 @@ Resources:
         - Key: Name
           Value: WordPress Public Route Table
 
+  # Create a route to the Internet Gateway
   PublicRoute:
     Type: AWS::EC2::Route
     DependsOn: AttachGateway
@@ -63,18 +69,21 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
+  # Associate the public route table with the first public subnet
   PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubnet1
       RouteTableId: !Ref PublicRouteTable
 
+  # Associate the public route table with the second public subnet
   PublicSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubnet2
       RouteTableId: !Ref PublicRouteTable
 
+# Output section to export values for use in other stacks
 Outputs:
   VPC:
     Description: A reference to the created VPC
@@ -99,6 +108,7 @@ Outputs:
     Value: !Ref PublicSubnet2
     Export:
       Name: !Sub "${AWS::StackName}-PublicSubnet2"
+
   VPCCIDR:
     Description: The CIDR block of the VPC
     Value: !GetAtt WordPressVPC.CidrBlock

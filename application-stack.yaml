@@ -2,6 +2,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Application Stack for WordPress Setup'
 
 Parameters:
+  # Input parameters for the stack
   NetworkingStackName:
     Type: String
     Description: The name of the networking stack
@@ -37,6 +38,7 @@ Parameters:
     NoEcho: true
 
 Resources:
+  # Security group for the EC2 instance
   WordPressInstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -54,6 +56,7 @@ Resources:
           ToPort: 22
           CidrIp: 0.0.0.0/0
 
+  # EC2 instance for WordPress
   WordPressInstance:
     Type: AWS::EC2::Instance
     Properties:
@@ -72,11 +75,15 @@ Resources:
         Fn::Base64: !Sub 
           - |
             #!/bin/bash
+            # Update and install dependencies
             yum update -y
-            amazon-linux-extras install -y lamp-mariadb10.2-php7.2 php7.2
-            yum install -y httpd
+            amazon-linux-extras enable php7.4
+            yum clean metadata
+            yum install -y httpd php php-mysqlnd php-fpm
             systemctl start httpd
             systemctl enable httpd
+            
+            # Set up Apache
             usermod -a -G apache ec2-user
             chown -R ec2-user:apache /var/www
             chmod 2775 /var/www
@@ -94,6 +101,13 @@ Resources:
             sed -i 's/username_here/${DBUser}/' /var/www/html/wp-config.php
             sed -i 's/password_here/${DBPassword}/' /var/www/html/wp-config.php
             sed -i 's/localhost/${DBEndpoint}/' /var/www/html/wp-config.php
+            
+            # Set correct ownership and permissions
+            chown -R apache:apache /var/www/html
+            chmod -R 755 /var/www/html
+            
+            # Restart Apache
+            systemctl restart httpd
           - DBEndpoint: 
               Fn::ImportValue: !Sub "${DatabaseStackName}-DBEndpoint"
 
@@ -101,6 +115,7 @@ Resources:
         - Key: Name
           Value: WordPress Instance
 
+# Output section to export values for use in other stacks
 Outputs:
   WebsiteURL:
     Description: WordPress Website
