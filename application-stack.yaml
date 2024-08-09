@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Application Stack for WordPress Setup'
+
+Parameters:
+  NetworkingStackName:
+    Type: String
+    Description: The name of the networking stack
+    Default: WordPressNetworking
+
+  DatabaseStackName:
+    Type: String
+    Description: The name of the database stack
+    Default: WordPressDatabase
+
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+
+  InstanceType:
+    Description: WebServer EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues: [t2.micro, t2.small, t2.medium]
+    ConstraintDescription: must be a valid EC2 instance type.
+
+  DBName:
+    Type: String
+    Default: wordpressdb
+
+  DBUser:
+    Type: String
+    Default: wpuser
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+
+Resources:
+  WordPressInstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP and SSH access
+      VpcId: 
+        Fn::ImportValue: 
+          !Sub "${NetworkingStackName}-VPCID"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  WordPressInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0440d3b780d96b29d  # Amazon Linux 2 AMI (HVM) - Kernel 5.10, SSD Volume Type
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet: 
+            - !Ref WordPressInstanceSecurityGroup
+          SubnetId: 
+            Fn::ImportValue:
+              !Sub "${NetworkingStackName}-PublicSubnet1"
+      UserData:
+        Fn::Base64: !Sub 
+          - |
+            #!/bin/bash
+            yum update -y
+            amazon-linux-extras install -y lamp-mariadb10.2-php7.2 php7.2
+            yum install -y httpd
+            systemctl start httpd
+            systemctl enable httpd
+            usermod -a -G apache ec2-user
+            chown -R ec2-user:apache /var/www
+            chmod 2775 /var/www
+            find /var/www -type d -exec chmod 2775 {} \;
+            find /var/www -type f -exec chmod 0664 {} \;
+            
+            # Install WordPress
+            wget https://wordpress.org/latest.tar.gz
+            tar -xzf latest.tar.gz
+            cp -r wordpress/* /var/www/html/
+            
+            # Configure WordPress
+            cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
+            sed -i 's/database_name_here/${DBName}/' /var/www/html/wp-config.php
+            sed -i 's/username_here/${DBUser}/' /var/www/html/wp-config.php
+            sed -i 's/password_here/${DBPassword}/' /var/www/html/wp-config.php
+            sed -i 's/localhost/${DBEndpoint}/' /var/www/html/wp-config.php
+          - DBEndpoint: 
+              Fn::ImportValue: !Sub "${DatabaseStackName}-DBEndpoint"
+
+      Tags:
+        - Key: Name
+          Value: WordPress Instance
+
+Outputs:
+  WebsiteURL:
+    Description: WordPress Website
+    Value: !Sub 'http://${WordPressInstance.PublicDnsName}'
+    Export:
+      Name: !Sub "${AWS::StackName}-WebsiteURL"
