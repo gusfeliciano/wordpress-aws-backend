@@ -99,3 +99,8 @@ Outputs:
     Value: !Ref PublicSubnet2
     Export:
       Name: !Sub "${AWS::StackName}-PublicSubnet2"
+  VPCCIDR:
+    Description: The CIDR block of the VPC
+    Value: !GetAtt WordPressVPC.CidrBlock
+    Export:
+      Name: !Sub "${AWS::StackName}-VPCCIDR"
